@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  # 1. Dịch vụ Database MySQL
+  mysqldb:
+    image: mysql:8.0
+    container_name: mysql-ai-container
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # 2. Dịch vụ Ứng dụng Java
+  ai-app:
+    build: .
+    container_name: ai-agent-app
+    env_file:
+      - .env
+    ports:
+      - "${SERVER_PORT}:8081"
+    depends_on:
+      mysqldb:
+        condition: service_healthy
+    environment:
+      SPRING_APPLICATION_NAME: demo-ai-groq
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysqldb:3306/${MYSQL_DATABASE}?createDatabaseIfNotExist=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+
+      # ===== GROQ AI =====
+      SPRING_AI_OPENAI_BASE_URL: https://api.groq.com/openai
+      SPRING_AI_OPENAI_API_KEY: ${GROQ_API_KEY}
+      SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: llama-3.3-70b-versatile
+      SPRING_AI_OPENAI_CHAT_OPTIONS_TEMPERATURE: "0.0"
+
+      SERVER_PORT: "8081"
+
+volumes:
+  db_data:
